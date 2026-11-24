@@ -1,0 +1,160 @@
+# ===============================================================================
+# AI-CDSS - Git Ignore Configuration
+# ===============================================================================
+
+# --- 1. Python & Bytecode ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# --- 2. Virtual Environments ---
+.venv/
+.venv*/
+venv/
+env/
+ENV/
+.env-mac/
+.env-win/
+Pipfile.lock
+poetry.lock
+
+# --- 3. Environment Variables & Secret Credentials ---
+.env
+.env.*
+.env.local
+.env.production
+.env.development
+backend/.env
+backend/.env.*
+!.env.example
+!backend/.env.example
+*.pem
+*.key
+*.cert
+*.crt
+
+# --- 4. Persistent Databases & SQLite ---
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+postgres_data/
+
+# --- 5. Node.js & Frontend Artifacts ---
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- 6. Runtime Patient Uploads & File Storage ---
+uploads/*
+backend/uploads/*
+!backend/uploads/.gitkeep
+backend/data/
+
+# --- 7. Caches, Profiling & Test Outputs ---
+.uv-cache/
+.pytest_cache/
+backend/.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.mpl-cache/
+backend/.mpl-cache/
+*.tmp
+*.bak
+*.swp
+*.swo
+*~
+
+# --- 8. Logs ---
+*.log
+*.out
+*.log.*
+
+# --- 9. Operating System Files ---
+# macOS
+.DS_Store
+*.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
+
+# Linux
+.directory
+
+# --- 10. IDEs & Editors ---
+.vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+.project
+.pydevproject
+.settings/
+
+# --- 11. Jupyter Notebooks ---
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# --- 12. Large Datasets & Model Weights (>100MB GitHub limit) ---
+# Note: Use Git LFS or external cloud storage for large weights.
+*.safetensors
+*.pt
+*.tar
+*.tar.gz
+*.rar
+*.zip
+
+# Raw Offline Datasets
+ml/data/physionet_2019/
+ml/data/ecg/
+ml/data/brain_tumor/
+ml/data/msd_task01/
+ml/data/msd_raw/
+ml/data/upenn_gbm/raw/
+ml/data/**/.download_cache/
+ml/data/**/UPLOAD_*
+ml/outputs/**/audit*/
+ml/outputs/**/*.npy
+
+# UPENN Glioblastoma Sample Selection (keep primary demo samples)
+ml/data/upenn_gbm/processed/images/UPENN-GBM-0000[6-9]*
+ml/data/upenn_gbm/processed/images/UPENN-GBM-0001*
+ml/data/upenn_gbm/processed/images/UPENN-GBM-0002*
+ml/data/upenn_gbm/processed/images/UPENN-GBM-0003[1-5]*
+ml/data/upenn_gbm/processed/labels/UPENN-GBM-0000[6-9]*
+ml/data/upenn_gbm/processed/labels/UPENN-GBM-0001*
+ml/data/upenn_gbm/processed/labels/UPENN-GBM-0002*
+ml/data/upenn_gbm/processed/labels/UPENN-GBM-0003[1-5]*
+
+# --- 13. AI & Assistant Tool Scratches ---
+scratch/
+.code-review-graph/
