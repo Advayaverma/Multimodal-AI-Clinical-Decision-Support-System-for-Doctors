@@ -134,8 +134,8 @@ $RECYCLE.BIN/
 *.rar
 *.zip
 
-# Raw Offline Datasets
-ml/data/physionet_2019/
+# Raw Offline Datasets (not needed for deployment, models are in ml/models/)
+ml/data/
 ml/data/ecg/
 ml/data/brain_tumor/
 ml/data/msd_task01/
