@@ -164,9 +164,9 @@ def _predict_xgboost(image_bytes: bytes) -> dict[str, Any]:
         embedding = _extract_embedding(image_bytes)  # (1, 768)
         proba = model.predict_proba(embedding)[0]     # (n_classes,)
         pred_idx = int(np.argmax(proba))
-        pred_class = le.inverse_transform([pred_idx])[0]
-        classes = list(le.classes_)
-        prob_dict = {cls: round(float(p), 4) for cls, p in zip(classes, proba)}
+        pred_class = str(le.inverse_transform([pred_idx])[0])
+        classes = [str(c) for c in le.classes_]
+        prob_dict = {str(cls): round(float(p), 4) for cls, p in zip(classes, proba)}
         return {
             "model_name": "XGBoost",
             "status": "ok",
@@ -191,8 +191,8 @@ def _predict_svm(image_bytes: bytes) -> dict[str, Any]:
         proba = model.predict_proba(embedding)[0]
         classes = model.classes_
         pred_idx = int(np.argmax(proba))
-        pred_class = classes[pred_idx]
-        prob_dict = {cls: round(float(p), 4) for cls, p in zip(classes, proba)}
+        pred_class = str(classes[pred_idx])
+        prob_dict = {str(cls): round(float(p), 4) for cls, p in zip(classes, proba)}
         return {
             "model_name": "SVM",
             "status": "ok",
