@@ -1,0 +1,52 @@
+# ═══════════════════════════════════════════════════════════════
+# Dockerfile — AI-CDSS Backend (FastAPI + PyTorch CPU + Monai)
+# Build: docker build -f docker/Dockerfile.backend -t ai-cdss-backend .
+# ═══════════════════════════════════════════════════════════════
+FROM python:3.11-slim
+
+# System deps:
+# - tesseract-ocr & tesseract-ocr-eng for OCR processing
+# - poppler-utils for PDF processing
+# - libgomp1 for XGBoost OpenMP acceleration
+# - libgl1 & libglib2.0-0 for OpenCV / image processing
+# - curl for Docker healthchecks
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    poppler-utils \
+    libgomp1 \
+    libgl1 \
+    libglib2.0-0 \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Upgrade pip
+RUN pip install --no-cache-dir --upgrade pip
+
+# Install Python dependencies first for optimal Docker layer caching
+COPY backend/requirements.txt ./requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy backend application, trained models, and RAG knowledge base
+COPY backend/ ./backend/
+COPY ml/models/ ./ml/models/
+COPY ml/ecg_classification/ ./ml/ecg_classification/
+COPY ml/scripts/ ./ml/scripts/
+COPY rag/ ./rag/
+
+# Ensure runtime directories exist
+RUN mkdir -p ./backend/uploads ./backend/data
+
+# Environment configuration
+ENV PYTHONPATH="/app/backend:/app"
+ENV HOST=0.0.0.0
+ENV PORT=8000
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app/backend
+EXPOSE 8000
+
+# Run FastAPI backend via launcher
+CMD ["python", "run_backend.py"]
