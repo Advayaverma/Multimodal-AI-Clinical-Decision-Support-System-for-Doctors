@@ -69,10 +69,15 @@ def _embed(texts: list[str], mode: str | None = None):
     if mode != "hashing":
         try:
             from sentence_transformers import SentenceTransformer
-            model = SentenceTransformer(MODEL_NAME, local_files_only=True)
+            try:
+                model = SentenceTransformer(MODEL_NAME, local_files_only=True)
+            except Exception:
+                # Cloud/container deployment (e.g. Hugging Face Spaces): download from hub if not cached
+                model = SentenceTransformer(MODEL_NAME)
             vectors = model.encode(texts, normalize_embeddings=True, show_progress_bar=False)
             return np.asarray(vectors, dtype="float32"), "sentence-transformers/all-MiniLM-L6-v2"
-        except (ImportError, OSError, RuntimeError):
+        except Exception as e:
+            logger.warning("SentenceTransformer embedding fallback: %s", e)
             pass
     vectors = HashingVectorizer(n_features=384, alternate_sign=False, norm="l2", stop_words="english").transform(texts)
     return vectors.toarray().astype("float32"), "hashing fallback"
@@ -95,15 +100,25 @@ def search(query: str, limit: int):
     if not INDEX_FILE.exists() or not META_FILE.exists():
         rebuild_index()
     metadata = json.loads(META_FILE.read_text(encoding="utf-8"))
-    mode = metadata["embedding_mode"]
-    vectors, _ = _embed([query], "hashing" if mode.startswith("hashing") else None)
+    index_mode = metadata.get("embedding_mode", "")
+    
+    # Embed query with preferred mode matching index or best available
+    vectors, current_mode = _embed([query], "hashing" if index_mode.startswith("hashing") else None)
+    
+    # If the index embedding mode doesn't match how we embedded the query, rebuild index to align spaces
+    if index_mode != current_mode or not INDEX_FILE.exists():
+        logger.info("Synchronizing guideline vector index mode: %s -> %s", index_mode, current_mode)
+        rebuild_index()
+        metadata = json.loads(META_FILE.read_text(encoding="utf-8"))
+        vectors, current_mode = _embed([query])
+
     index = faiss.read_index(str(INDEX_FILE))
     scores, ids = index.search(vectors, min(limit, index.ntotal))
     results = []
     for score, item_id in zip(scores[0], ids[0]):
         if item_id >= 0:
             results.append({**metadata["chunks"][int(item_id)], "score": round(float(score), 4)})
-    return {"query": query, "embedding_mode": mode, "results": results}
+    return {"query": query, "embedding_mode": current_mode, "results": results}
 
 
 def _clean_chunk_text(text: str) -> str:
@@ -206,7 +221,12 @@ def _synthesize_local_answer(question: str, evidence: List[Dict[str, Any]], pati
     is_readmission = any(k in q_lower for k in ["readmission", "30-day", "hospital", "discharge", "risk factor"])
     is_abnormal_query = any(k in q_lower for k in ["abnormal", "out of range", "flagged", "priority finding", "critical", "concern"])
     is_report_query = any(k in q_lower for k in ["report", "x-ray", "xray", "radiograph", "imaging", "scan", "ultrasound", "usg", "ct", "mri", "biopsy", "ecg", "ekg", "finding", "impression", "investigation"])
-    is_condition_query = any(k in q_lower for k in ["diagnos", "condition", "history", "problem list"]) or (("have" in q_lower or "has" in q_lower or "does" in q_lower) and any(k in q_lower for k in ["diabet", "hypertens", "asthma", "heart", "disease", "copd", "kidney"]))
+    is_guideline_word = any(k in q_lower for k in ["guideline", "standard", "recommendation", "criteria", "protocol", "screen"])
+    is_condition_query = (
+        (any(k in q_lower for k in ["condition", "problem list", "medical history", "past history"]) or
+         (("have" in q_lower or "has" in q_lower or "does" in q_lower) and any(p in q_lower for p in ["patient", "he", "she", "they", "diagnosed with", "suffer from"]) and any(k in q_lower for k in ["diabet", "hypertens", "asthma", "heart", "disease", "copd", "kidney"])))
+        and not is_guideline_word and not is_diabetes_screening and not is_diabetes_mgmt and not is_bp_query and not is_heart_failure and not is_readmission
+    )
     is_med_query = any(k in q_lower for k in ["medication", "medicine", "drug", "prescription", "taking", "prescribed", "treatment", "therapy"])
     is_summary_query = any(k in q_lower for k in ["summarize", "summary", "overview", "status", "profile"]) and p_name
 
@@ -485,18 +505,21 @@ def _synthesize_local_answer(question: str, evidence: List[Dict[str, Any]], pati
         if p_name:
             sections.append(f"\n---\n\n#### Clinical Application to {p_name} ({p_age}):")
             has_diab_hist = any("diabet" in c["condition"].lower() for c in cond_items)
-            g_labs = [t for t in all_tests if any(k in t["name"].lower() for k in ["glucose", "hba1c"])]
+            g_labs = [t for t in all_tests if any(k in t["name"].lower() for k in ["glucose", "hba1c", "sugar"])]
             if has_diab_hist:
                 sections.append(f"- **History Alignment:** Patient has a documented diagnosis of diabetes. Ongoing monitoring focuses on therapeutic HbA1c target `< 7.0%` [1].")
             if g_labs:
                 sections.append(f"- **Current Laboratory Values:** {_format_test_summary(g_labs)}.")
                 for gl in g_labs:
-                    val = float(re.findall(r"\d+(?:\.\d+)?", gl["value"])[0]) if re.findall(r"\d+(?:\.\d+)?", gl["value"]) else None
-                    if val is not None and "glucose" in gl["name"].lower():
+                    nums = re.findall(r"\d+(?:\.\d+)?", gl["value"])
+                    val = float(nums[0]) if nums else None
+                    if val is not None and any(k in gl["name"].lower() for k in ["glucose", "sugar"]):
                         if val >= 126:
-                            sections.append(f"- **Guideline Assessment:** Measured fasting glucose `{gl['value']} {gl['unit']}` exceeds the diagnostic threshold (`>= 126 mg/dL`), confirming significant glycemic elevation [1].")
+                            sections.append(f"- **Guideline Assessment:** Measured glucose `{gl['value']} {gl['unit']}` exceeds the fasting diagnostic threshold (`>= 126 mg/dL`), indicating glycemic elevation [1].")
                         elif 100 <= val <= 125:
-                            sections.append(f"- **Guideline Assessment:** Measured fasting glucose `{gl['value']} {gl['unit']}` falls within the impaired fasting glucose (prediabetes) range [1].")
+                            sections.append(f"- **Guideline Assessment:** Measured glucose `{gl['value']} {gl['unit']}` falls within the impaired fasting glucose (prediabetes) range [1].")
+                        else:
+                            sections.append(f"- **Guideline Assessment:** Measured glucose `{gl['value']} {gl['unit']}` is within standard reference boundaries [1].")
             else:
                 sections.append(f"- **Next Step:** Screen with Fasting Plasma Glucose or HbA1c as patient meets age and risk criteria [1].")
 
@@ -733,7 +756,20 @@ def answer(question: str, limit: int, patient_info: Optional[Dict[str, Any]] = N
         )
     )
     
-    has_relevant_guideline = top_score >= SIMILARITY_THRESHOLD
+    # Check if query targets clinical guideline domains
+    is_diabetes_screening = any(k in q_lower for k in ["screen", "diagnos", "criteria", "a1c", "fpg", "ogtt", "prediabetes"]) and any(k in q_lower for k in ["diabet", "glucose", "sugar"])
+    is_diabetes_mgmt = any(k in q_lower for k in ["treatment", "manage", "drug", "pharmacolog", "metformin", "insulin", "sglt2", "glp-1", "therapy"]) and any(k in q_lower for k in ["diabet", "glycemic", "glucose"])
+    is_bp_query = any(k in q_lower for k in ["blood pressure", "hypertens", "bp", "stage 1", "stage 2", "dash", "cardiovascular"])
+    is_heart_failure = any(k in q_lower for k in ["heart failure", "hfref", "hfpef", "cardiomyopathy", "ejection fraction"])
+    is_readmission = any(k in q_lower for k in ["readmission", "30-day", "hospital", "discharge", "risk factor"])
+    is_cholesterol_guideline = any(k in q_lower for k in ["cholesterol", "lipid", "ldl", "hdl", "triglyceride"])
+    is_guideline_topic = bool(
+        is_diabetes_screening or is_diabetes_mgmt or is_bp_query or 
+        is_heart_failure or is_readmission or is_cholesterol_guideline or
+        any(k in q_lower for k in CLINICAL_KEYWORDS)
+    )
+    
+    has_relevant_guideline = (top_score >= SIMILARITY_THRESHOLD) or is_guideline_topic
 
     # Strict Relevance Filter:
     # If the question is neither about patient records nor has relevant guideline match in FAISS, reject it.
@@ -750,6 +786,8 @@ def answer(question: str, limit: int, patient_info: Optional[Dict[str, Any]] = N
 
     # Filter evidence chunks to only those passing relevance
     filtered_evidence = [e for e in evidence if e.get("score", 0.0) >= SIMILARITY_THRESHOLD * 0.75]
+    if not filtered_evidence and evidence and (is_guideline_topic or is_patient_record_query):
+        filtered_evidence = evidence[:min(3, len(evidence))]
 
     # Attempt external LLM if configured and evidence is valid
     if has_relevant_guideline or is_patient_record_query:
