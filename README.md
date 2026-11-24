@@ -1,15 +1,3 @@
----
-title: AI CDSS BACKEND
-emoji: 🩺
-colorFrom: green
-colorTo: indigo
-sdk: gradio
-sdk_version: 4.44.0
-app_file: app.py
-pinned: false
-license: mit
----
-
 # Explainable Multimodal Clinical Decision Support System (AI-CDSS)
 
 [![SaMD Class II Prototype](https://img.shields.io/badge/Regulatory-SaMD%20Class%20II%20Non--Autonomous-blue.svg)](#-clinical-safety-governance--samd-compliance)
