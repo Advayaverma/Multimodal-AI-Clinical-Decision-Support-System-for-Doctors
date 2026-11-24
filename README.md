@@ -8,22 +8,6 @@
 [![Docker Ready](https://img.shields.io/badge/Deployment-Docker%20Compose-2496ed.svg)](#-deployment--quickstart-guide)
 [![Tests Passing](https://img.shields.io/badge/Tests-118%2B%20Passing-success.svg)](#-software-quality-assurance--testing)
 
----
-
-### Capstone Project Information
-- **Academic Program:** Bachelor of Technology in Computer Science with Business Studies
-- **Institution:** School of Computer Science and Engineering, **VIT-AP University**, Amaravati, Andhra Pradesh, India
-- **Completion Date:** November 2026
-- **Project Team:**
-  - **Animesh Tiwari** (23BCB7145)
-  - **Advaya Verma** (23BCB7160)
-  - **Anubhav Srivastava** (23BCB7121)
-  - **Asmit Singh** (23BCB7143)
-- **Project Guide:** **Dr. Gosala Bethany**, School of Computer Science and Engineering, VIT-AP University
-- **Official Repository:** [https://github.com/Animesh0709/AI-CDSS-platform](https://github.com/Animesh0709/AI-CDSS-platform)
-
----
-
 ## ⚠️ Clinical Safety Governance & SaMD Compliance
 
 > [!IMPORTANT]
