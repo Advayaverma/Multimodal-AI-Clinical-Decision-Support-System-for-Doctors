@@ -127,6 +127,7 @@ $RECYCLE.BIN/
 # --- 12. Large Datasets & Model Weights (>100MB GitHub limit) ---
 # Note: Use Git LFS or external cloud storage for large weights.
 *.safetensors
+!ml/models/mri_vit/model.safetensors
 *.pt
 *.tar
 *.tar.gz
